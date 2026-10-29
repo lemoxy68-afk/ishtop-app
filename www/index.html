@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="uz"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ishtop</title>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--tx:#1b2430;--mu:#6b7686;--pr:#1f6feb;--ok:#16a34a;--bd:#e3e8ef}
+*{box-sizing:border-box}body{margin:0;font:15px/1.45 system-ui,Arial,sans-serif;background:var(--bg);color:var(--tx);padding-bottom:70px}
+header{background:var(--pr);color:#fff;padding:14px 16px;font-size:20px;font-weight:700;position:sticky;top:0;z-index:5}
+main{padding:12px;max-width:640px;margin:auto}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin-bottom:10px}
+h3{margin:0 0 6px;font-size:16px}.mu{color:var(--mu);font-size:13px}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;font:inherit;margin:4px 0 10px;background:#fff}
+textarea{min-height:130px}label{font-size:13px;color:var(--mu)}
+button{border:0;border-radius:8px;padding:10px 14px;font:inherit;font-weight:600;background:var(--pr);color:#fff;cursor:pointer}
+button.g{background:#e8eef9;color:var(--pr)}button.r{background:#fde8e8;color:#c62828}button.ok{background:var(--ok)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>*{flex:0 0 auto}
+.chip{display:inline-block;background:#eef2f8;border-radius:20px;padding:3px 10px;font-size:12px;margin:0 4px 4px 0}
+.chip.m{background:#dcfce7;color:#15803d;font-weight:700}
+.sel{background:var(--pr);color:#fff}
+.ck{display:inline-flex;gap:6px;align-items:center;background:#fff;border:1px solid var(--bd);border-radius:20px;padding:6px 12px;margin:0 6px 6px 0;font-size:14px}
+.ck input{width:auto;margin:0}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--bd);display:flex;padding-bottom:env(safe-area-inset-bottom,0)}
+nav a{flex:1;text-align:center;padding:12px 4px;font-size:13px;color:var(--mu);font-weight:600}nav a.on{color:var(--pr)}
+img.pic{width:100%;max-height:240px;object-fit:cover;border-radius:8px;margin:6px 0}
+pre{white-space:pre-wrap;font:inherit;margin:6px 0}
+</style></head><body>
+<header id="hd">Ishtop</header><main id="app"></main><nav id="nav"></nav>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+// 1) Firebase konsolidan o'z sozlamalaringizni shu yerga qo'ying
+const firebaseConfig={apiKey:"AIzaSyDOHi3-8hJSdYqL7lb96-wztvtkGDlpsKA",authDomain:"ishtop-caf4b.firebaseapp.com",projectId:"ishtop-caf4b",storageBucket:"ishtop-caf4b.firebasestorage.app",messagingSenderId:"60290763322",appId:"1:60290763322:web:c4676de320e4b1df1c4303"};
+
+const CATS=["Ishlab chiqarish","Sotuv / savdo","Ofis / menejer","Haydovchi / yetkazish","Qurilish","Xizmat ko'rsatish","Texnik / IT","Boshqa"];
+const REG=["Namangan shahri","Chortoq","Chust","Kosonsoy","Mingbuloq","Norin","Pop","To'raqo'rg'on","Uchqo'rg'on","Uychi","Yangiqo'rg'on","Boshqa hudud"];
+const TPL={
+ ish:{name:"Ishlab chiqarish ishchisi",cat:"Ishlab chiqarish",f:[["Kompaniya"],["Lavozim","Oddiy ishchi"],["Soni","3 ta"],["Yoshi","18 dan 35 gacha"],["Jinsi","Erkak va ayollar"],["Tajribasi","Shart emas"],["Ish vaqti","08:00 dan 18:00 gacha"],["Maosh"],["Sharoit","Tushlik ishxona hisobidan"],["Manzil"]]},
+ ofis:{name:"Ofis-menejer / ish yurituvchi",cat:"Ofis / menejer",f:[["Kompaniya"],["Yoshi","20-30"],["Jinsi","Ayol"],["Tillar","Rus, o'zbek, ingliz"],["Talablar","Excel, Word, 1C; hujjatlar bilan ishlash"],["Ish vaqti","Dushanba–Juma 09:00–17:00, shanba qisqa kun"],["Maosh"],["Sharoit","Tushlik kompaniya hisobidan"],["Manzil"]]},
+ sotuv:{name:"Sotuv agenti / vansel agent",cat:"Sotuv / savdo",f:[["Kompaniya"],["Lavozim","Vansel agent"],["Shart","Shaxsiy avtomashina bo'lishi kerak"],["Jinsi","Erkak"],["Yoshi","20 — 40"],["Talablar","Mas'uliyatli, muomalasi yaxshi, hisob-kitobni biladi"],["Hudud","Namangan shahar va tumanlar"],["Ish vaqti","08:30 — 18:00, dam olish yakshanba"],["Daromad","Savdodan 10%"]]},
+ xiz:{name:"Bir nechta bo'sh ish o'rni",cat:"Xizmat ko'rsatish",f:[["Kompaniya"],["Bo'sh ish o'rinlari","1. ...\n2. ..."],["Maosh"],["Ish vaqti","8:00 - 19:00, 6/1"],["Yoshi","18 - 28"],["Talablar","Ishga mas'uliyat, mijozlar bilan muomala"],["Imkoniyatlar","Ahil jamoa, kafolatli oylik"],["Manzil"]]}
+};
+let me=JSON.parse(localStorage.getItem("me")||"null"),uid=null,jobs=[],tab="home",draft=null,open={},fav=JSON.parse(localStorage.getItem("fav")||"[]"),q={cat:"",reg:"",s:""},db,auth;
+const $=s=>document.querySelector(s),E=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const DAY=864e5;
+
+try{firebase.initializeApp(firebaseConfig);db=firebase.firestore();auth=firebase.auth();
+ auth.signInAnonymously().then(u=>{uid=u.user.uid;listen();draw()}).catch(e=>{alert("Firebase xato: "+e.message);draw()})}
+catch(e){draw()}
+
+function listen(){db.collection("jobs").orderBy("createdAt","desc").limit(150).onSnapshot(s=>{jobs=s.docs.map(d=>({id:d.id,...d.data()}));draw()})}
+const alive=j=>j.status!=="off"&&(j.reports||0)<3&&Date.now()-(j.createdAt?.toMillis?.()||Date.now())<30*DAY;
+const match=j=>me&&me.role==="seeker"&&(me.skills||[]).includes(j.category);
+
+function draw(){
+ $("#hd").textContent="Ishtop";
+ const nav=[["home","Ishlar"],["fav","Saqlangan"]];
+ if(me?.role==="employer"){nav.push(["new","+ E'lon"],["mine","E'lonlarim"])}
+ nav.push(["me","Profil"]);
+ $("#nav").innerHTML=me?nav.map(([k,t])=>`<a class="${tab===k?"on":""}" onclick="go('${k}')">${t}</a>`).join(""):"";
+ const app=$("#app");
+ if(!me)return app.innerHTML=loginView();
+ app.innerHTML=({home:homeView,fav:()=>listView(jobs.filter(j=>fav.includes(j.id)&&alive(j)),"Saqlangan ishlar yo'q"),new:newView,mine:()=>listView(jobs.filter(j=>j.owner===uid),"Hali e'lon bermagansiz",true),me:meView})[tab]();
+}
+function go(t){tab=t;if(t==="new"&&!draft)draft={mode:"",tpl:"",v:{},title:"",text:"",cat:CATS[0],reg:REG[0],salary:"",phone2:"",img:""};draw();scrollTo(0,0)}
+
+/* ---------- Kirish ---------- */
+let L={role:"seeker",skills:[]};
+function loginView(){return `<div class="card"><h3>Xush kelibsiz!</h3><div class="mu">Ro'yxatdan o'tish bir daqiqa</div><br>
+<div class="row"><button class="${L.role==="seeker"?"":"g"}" onclick="L.role='seeker';draw()">Ish qidiryapman</button><button class="${L.role==="employer"?"":"g"}" onclick="L.role='employer';draw()">Ish beruvchiman</button></div><br>
+<label>Ismingiz</label><input id="nm" value="${E(L.name)}">
+<label>Telefon raqam</label><input id="ph" type="tel" placeholder="+998 90 123 45 67" value="${E(L.phone)}">
+${L.role==="seeker"?`<label>Nima qila olasiz? (belgilang)</label><div>${CATS.map(c=>`<label class="ck"><input type="checkbox" ${L.skills.includes(c)?"checked":""} onchange="tg('${c}',this.checked)">${c}</label>`).join("")}</div>
+<label>Hududingiz</label><select id="rg">${REG.map(r=>`<option>${r}</option>`).join("")}</select>`:""}
+<button class="ok" onclick="reg()">Boshlash</button></div>`}
+function tg(c,on){L.skills=on?[...L.skills,c]:L.skills.filter(x=>x!==c)}
+function reg(){const name=$("#nm").value.trim(),phone=$("#ph").value.replace(/[^\d+]/g,"");L.name=name;L.phone=phone;
+ if(!name||phone.replace(/\D/g,"").length<9)return alert("Ism va telefon raqamni to'g'ri kiriting");
+ me={role:L.role,name,phone,skills:L.role==="seeker"?L.skills:[],reg:$("#rg")?.value||""};save()}
+function save(){localStorage.setItem("me",JSON.stringify(me));if(db&&uid)db.collection("users").doc(uid).set(me);tab="home";draw()}
+
+/* ---------- Ishlar ro'yxati ---------- */
+function homeView(){
+ const f=jobs.filter(j=>alive(j)&&(!q.cat||j.category===q.cat)&&(!q.reg||j.region===q.reg)&&(!q.s||(j.title+j.text).toLowerCase().includes(q.s.toLowerCase())));
+ f.sort((a,b)=>match(b)-match(a));
+ return `<div class="card"><input placeholder="Qidirish..." value="${E(q.s)}" onchange="q.s=this.value;draw()" style="margin-bottom:6px">
+ <div class="row"><select style="flex:1" onchange="q.cat=this.value;draw()"><option value="">Barcha kategoriya</option>${CATS.map(c=>`<option ${q.cat===c?"selected":""}>${c}</option>`).join("")}</select>
+ <select style="flex:1" onchange="q.reg=this.value;draw()"><option value="">Barcha hudud</option>${REG.map(c=>`<option ${q.reg===c?"selected":""}>${c}</option>`).join("")}</select></div></div>`+listView(f,"E'lonlar topilmadi")}
+function listView(a,empty,mine){return a.length?a.map(j=>card(j,mine)).join(""):`<div class="card mu">${empty}</div>`}
+function card(j,mine){const o=open[j.id],ph=(j.phone||"").replace(/[^\d+]/g,"");
+ return `<div class="card">${match(j)?'<span class="chip m">Sizga mos</span>':""}<h3>${E(j.title)}</h3>
+ <span class="chip">${E(j.category)}</span><span class="chip">${E(j.region)}</span>${j.salary?`<span class="chip">💰 ${E(j.salary)}</span>`:""}
+ ${j.img&&o?`<img class="pic" src="${j.img}">`:""}<pre>${E(o?j.text:j.text.slice(0,120)+(j.text.length>120?"...":""))}</pre>
+ <div class="row"><button class="g" onclick="open['${j.id}']=!open['${j.id}'];draw()">${o?"Yopish":"Batafsil"}</button>
+ <a href="tel:${ph}"><button class="ok">📞 Qo'ng'iroq</button></a>
+ <a href="https://t.me/${ph.startsWith("+")?ph:"+"+ph}"><button class="g">Telegram</button></a>
+ <button class="g" onclick="fv('${j.id}')">${fav.includes(j.id)?"♥":"♡"}</button>
+ ${mine?`<button class="g" onclick="edit('${j.id}')">Tahrirlash</button><button class="g" onclick="renew('${j.id}')">Yangilash</button><button class="r" onclick="del('${j.id}')">O'chirish</button>`:`<button class="r" onclick="rep('${j.id}')">Shikoyat</button>`}</div>
+ ${j.source?`<div class="mu">Manba: ${E(j.source)}</div>`:""}</div>`}
+function fv(id){fav=fav.includes(id)?fav.filter(x=>x!==id):[...fav,id];localStorage.setItem("fav",JSON.stringify(fav));draw()}
+function rep(id){if(confirm("Bu e'lon haqida shikoyat qilasizmi?"))db.collection("jobs").doc(id).update({reports:firebase.firestore.FieldValue.increment(1)})}
+function del(id){if(confirm("E'lon o'chirilsinmi?"))db.collection("jobs").doc(id).delete()}
+function renew(id){db.collection("jobs").doc(id).update({createdAt:firebase.firestore.FieldValue.serverTimestamp()});alert("E'lon yangilandi")}
+function edit(id){const j=jobs.find(x=>x.id===id);draft={id,mode:"own",tpl:"",v:{},title:j.title,text:j.text,cat:j.category,reg:j.region,salary:j.salary||"",phone2:j.phone2||"",img:j.img||""};tab="new";draw()}
+
+/* ---------- E'lon berish ---------- */
+function newView(){const d=draft,t=TPL[d.tpl];
+ let h=`<div class="card"><h3>${d.id?"E'lonni tahrirlash":"Yangi e'lon"}</h3>`;
+ if(!d.id)h+=`<div class="mu">Shablon bo'yicha yozasizmi yoki o'zingizmi?</div><div class="row" style="margin:8px 0"><button class="${d.mode==="tpl"?"":"g"}" onclick="draft.mode='tpl';draw()">Shablon bo'yicha</button><button class="${d.mode==="own"?"":"g"}" onclick="draft.mode='own';draw()">O'zim yozaman</button></div>`;
+ if(d.mode==="tpl"&&!d.id){h+=`<label>Qaysi shablon?</label><div class="row" style="margin:6px 0">${Object.entries(TPL).map(([k,x])=>`<button class="${d.tpl===k?"":"g"}" onclick="pick('${k}')">${x.name}</button>`).join("")}</div>`;
+  if(t)h+=t.f.map(([l,df],i)=>`<label>${l}</label>${(df||"").includes("\n")?`<textarea style="min-height:70px" oninput="draft.v[${i}]=this.value">${E(d.v[i]??df)}</textarea>`:`<input value="${E(d.v[i]??df??"")}" oninput="draft.v[${i}]=this.value">`}`).join("")+`<button class="ok" onclick="gen()">Matnni yaratish</button><br><br>`}
+ if(d.mode||d.id)h+=`<label>Sarlavha</label><input value="${E(d.title)}" oninput="draft.title=this.value">
+ <label>E'lon matni (o'zgartirishingiz mumkin)</label><textarea oninput="draft.text=this.value">${E(d.text)}</textarea>
+ <label>Kategoriya</label><select onchange="draft.cat=this.value">${CATS.map(c=>`<option ${d.cat===c?"selected":""}>${c}</option>`).join("")}</select>
+ <label>Hudud</label><select onchange="draft.reg=this.value">${REG.map(c=>`<option ${d.reg===c?"selected":""}>${c}</option>`).join("")}</select>
+ <label>Maosh (masalan: 3 000 000 — 5 000 000)</label><input value="${E(d.salary)}" oninput="draft.salary=this.value">
+ <label>Telefon (profilingizdagi: ${E(me.phone)})</label><input type="tel" placeholder="Qo'shimcha telefon (ixtiyoriy)" value="${E(d.phone2)}" oninput="draft.phone2=this.value">
+ <label>Rasm (bitta)</label><input type="file" accept="image/*" onchange="img(this)">${d.img?`<img class="pic" src="${d.img}"><button class="r" onclick="draft.img='';draw()">Rasmni olib tashlash</button><br><br>`:""}
+ <button class="ok" onclick="pub()">${d.id?"Saqlash":"Joylash"}</button>`;
+ return h+"</div>"}
+function pick(k){draft.tpl=k;draft.v={};draft.cat=TPL[k].cat;draft.title=TPL[k].name;draw()}
+function gen(){const t=TPL[draft.tpl];draft.text=t.f.map(([l,df],i)=>{const v=(draft.v[i]??df??"").trim();return v?`▪ ${l}: ${v}`:""}).filter(Boolean).join("\n");
+ const m=(draft.v[t.f.findIndex(x=>/Maosh|Daromad/.test(x[0]))]||"");if(m&&!draft.salary)draft.salary=m;draw()}
+function img(el){const f=el.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,800/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*k;c.height=i.height*k;c.getContext("2d").drawImage(i,0,0,c.width,c.height);draft.img=c.toDataURL("image/jpeg",.65);draw()};i.src=r.result};r.readAsDataURL(f)}
+async function pub(){const d=draft;if(!d.title.trim()||d.text.trim().length<15)return alert("Sarlavha va matnni to'ldiring");
+ const o={title:d.title.trim(),text:d.text.trim(),category:d.cat,region:d.reg,salary:d.salary.trim(),phone:me.phone,phone2:d.phone2.trim(),img:d.img,owner:uid,status:"on"};
+ try{if(d.id)await db.collection("jobs").doc(d.id).update(o);else await db.collection("jobs").add({...o,reports:0,createdAt:firebase.firestore.FieldValue.serverTimestamp()});
+ draft=null;tab="mine";draw();alert("Tayyor!")}catch(e){alert("Xato: "+e.message)}}
+
+/* ---------- Profil ---------- */
+function meView(){return `<div class="card"><h3>${E(me.name)}</h3><div class="mu">${me.role==="seeker"?"Ish qidiruvchi":"Ish beruvchi"} · ${E(me.phone)}</div><br>
+ ${me.role==="seeker"?`<label>Nima qila olasiz?</label><div>${CATS.map(c=>`<label class="ck"><input type="checkbox" ${(me.skills||[]).includes(c)?"checked":""} onchange="me.skills=this.checked?[...me.skills,'${c}']:me.skills.filter(x=>x!=='${c}');save2()">${c}</label>`).join("")}</div>`:""}
+ <button class="r" onclick="if(confirm('Chiqasizmi?')){localStorage.removeItem('me');me=null;L={role:'seeker',skills:[]};draw()}">Chiqish</button></div>`}
+function save2(){localStorage.setItem("me",JSON.stringify(me));if(db&&uid)db.collection("users").doc(uid).set(me)}
+</script></body></html>
